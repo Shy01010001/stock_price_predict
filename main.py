@@ -11,6 +11,8 @@ from modules.metrics import compute_scores
 from modules.optimizers import build_optimizer, build_lr_scheduler
 from modules.tokenizers import Tokenizer
 from modules.trainer import Trainer
+import torch.optim as optim
+import torch.nn as nn
 # from modules.base_cmn import get_dict
 # import json
 
@@ -40,7 +42,7 @@ def parse_args():
                         help='whether to load the pretrained visual extractor')
 
     # Model settings (for Transformer)
-    parser.add_argument('--d_model', type=int, default=512, help='the dimension of Transformer')
+    parser.add_argument('--d_model', type=int, default=4096, help='the dimension of Transformer')
     parser.add_argument('--d_ff', type=int, default=512, help='the dimension of FFN')
     parser.add_argument('--d_vf', type=int, default=2048, help='the dimension of the patch features')
     parser.add_argument('--num_heads', type=int, default=8, help='the number of heads in Transformer')
@@ -132,29 +134,35 @@ def main():
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     np.random.seed(args.seed)
-
-    # create tokenizer
-    
     
     # create data loader
-    train_dataloader = R2DataLoader(args, tokenizer, split='train', shuffle=True)
-    valid_dataloader = R2DataLoader(args, tokenizer, split='val', shuffle=False)
-    test_dataloader = R2DataLoader(args, tokenizer, split='test', shuffle=False)
+    train_dataloader = R2DataLoader(args, split='train', shuffle=True)
+    test_dataloader = R2DataLoader(args, split='test', shuffle=False)
 
     # build model architecture
     model = BaseCMNModel(args, tokenizer)
 
     # get function handles of loss and metrics
-    criterion = compute_loss
+    criterion = nn.MSELoss()
     metrics = compute_scores
 
     # build optimizer, learning rate scheduler
-    optimizer = build_optimizer(args, model)
-    lr_scheduler = build_lr_scheduler(args, optimizer)
+    learning_rate = 0.001  # 学习率
+    weight_decay = 1e-5  # 权重衰减（L2正则化）
+    betas = (0.9, 0.999)  # beta1 和 beta2 参数
+    eps = 1e-8    
+    optimizer = optim.Adam(
+    model.parameters(),
+    lr=learning_rate,
+    betas=betas,
+    eps=eps,
+    weight_decay=weight_decay
+)
+    # lr_scheduler = build_lr_scheduler(args, optimizer)
 
     # build trainer and start to train
-    trainer = Trainer(model, criterion, metrics, optimizer, args, lr_scheduler,
-                      train_dataloader, valid_dataloader, test_dataloader)
+    trainer = Trainer(model, criterion, metrics, optimizer, args,
+                      train_dataloader, test_dataloader)
     trainer.train()
 
 

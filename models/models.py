@@ -23,19 +23,12 @@ class BaseCMNModel(nn.Module):
         params = sum([np.prod(p.size()) for p in model_parameters])
         return super().__str__() + '\nTrainable parameters: {}'.format(params)
 
-    def forward_iu_xray(self, images, targets=None, mode='train', update_opts={}): # [batch_size, image_num, 3, 224, 224], [batch_size, max_seq_len]
-        att_feats_0, fc_feats_0 = self.visual_extractor(images[:, 0]) # [16, 49, 2048], [16, 2048], [16, 3, 224, 224]
-        att_feats_1, fc_feats_1 = self.visual_extractor(images[:, 1]) # 分别抽取每张图像的特征
-        fc_feats = torch.cat((fc_feats_0, fc_feats_1), dim=1) # [16, 4096]
-        att_feats = torch.cat((att_feats_0, att_feats_1), dim=1) # [16, 98, 2048]
+    def forward_iu_xray(self, inp, mode='train'): # [batch_size, image_num, 3, 224, 224], [batch_size, max_seq_len]
+
         if mode == 'train':
-            output = self.encoder_decoder(fc_feats, att_feats, targets, mode='forward') # CaptionModel
+            output = self.encoder_decoder(inp) # CaptionModel
             return output # [batch_size, max_seq_len-1, vocab_size+1]
-        elif mode == 'sample':
-            output, output_probs = self.encoder_decoder(fc_feats, att_feats, mode='sample', update_opts=update_opts)
-            return output, output_probs
-        else:
-            raise ValueError
+
 
     def forward_mimic_cxr(self, images, targets=None, mode='train', update_opts={}):
         att_feats, fc_feats = self.visual_extractor(images)

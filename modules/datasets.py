@@ -118,74 +118,57 @@ def pos_tagging(documents, tokenizer):
 
 
 class BaseDataset(Dataset):
-    def __init__(self, args, tokenizer, split, transform=None):
-        self.image_dir = args.image_dir
-        self.ann_path = args.ann_path
-        self.max_seq_length = args.max_seq_length # 60
-        self.split = split # train/valid/test
-        self.tokenizer = tokenizer
-        self.transform = transform
-        self.ann = json.loads(open(self.ann_path, 'r').read())
-        self.examples = self.ann[self.split] # list of dicts
-        # self.tf_idf = json.loads(open('./data/iu_xray/tf_idf.json', 'r').read())[self.split]
+    def __init__(self, path, split, transform):
+        with open(path, 'r') as f:
+            data = json.load(f)
+            self.samples = data[split]
+        self.samples['input'] = transform(self.samples['input'])
+        self.samples['label'] = transform(self.samples['label'])
         
-        # dd = {}
-        # documents = []
-        
-        # for key in self.ann:
-            # for dic in self.ann[key]:
-                # documents.append(self.tokenizer.clean_report_iu_xray(dic['report']))    
-        # speach_dict = pos_tagging(documents, self.tokenizer)
-        # dd['train'] = tf_idf[:2069]
-        # dd['val'] = tf_idf[2069:2069+296]
-        # dd['test'] = tf_idf[2069+296:2069+296+590]
-        # save_path = './data/iu_xray/ids_2_tf_idf.json'
-        # with open(save_path, "w") as f:
-        #     json.dump(dd, f)
-        # exit()
-        for i in range(len(self.examples)): # 每个例子
-            self.examples[i]['ids'] = tokenizer(self.examples[i]['report'])[:self.max_seq_length]
-            self.examples[i]['mask'] = [1] * len(self.examples[i]['ids'])
-            # self.examples[i]['tf_idf'] = self.tf_idf[i][:self.max_seq_length]
     def __len__(self):
-        return len(self.examples)
+        return len(self.samples)
 
-
-class IuxrayMultiImageDataset(BaseDataset):
     def __getitem__(self, idx):
-        example = self.examples[idx]
-        image_id = example['id']
-        image_path = example['image_path']
+        input_data = self.samples['input'][idx]
+        gtr = self.samples['label'][idx]
+        
+        return (input_data, gtr)
+
+# class IuxrayMultiImageDataset(BaseDataset):
+#     def __getitem__(self, idx):
+#         example = self.examples[idx]
+#         image_id = example['id']
+#         image_path = example['image_path']
         
 
-        image_1 = Image.open(os.path.join(self.image_dir, image_path[0])).convert('RGB')
-        image_2 = Image.open(os.path.join(self.image_dir, image_path[1])).convert('RGB')
-        if self.transform is not None:
-            image_1 = self.transform(image_1) # [3, 224, 224]
-            image_2 = self.transform(image_2)
+#         image_1 = Image.open(os.path.join(self.image_dir, image_path[0])).convert('RGB')
+#         image_2 = Image.open(os.path.join(self.image_dir, image_path[1])).convert('RGB')
+#         if self.transform is not None:
+#             image_1 = self.transform(image_1) # [3, 224, 224]
+#             image_2 = self.transform(image_2)
 
-        image = torch.stack((image_1, image_2), 0) # [2图片, 3, 224, 224]
-        report_ids = example['ids']
-        report_masks = example['mask']
-        seq_length = len(report_ids) 
-        # sample = (image_id, image, report_ids, report_masks, seq_length, tf_idf)
-        sample = (image_id, image, report_ids, report_masks, seq_length)
-        return sample
+#         image = torch.stack((image_1, image_2), 0) # [2图片, 3, 224, 224]
+#         report_ids = example['ids']
+#         report_masks = example['mask']
+#         seq_length = len(report_ids) 
+#         # sample = (image_id, image, report_ids, report_masks, seq_length, tf_idf)
+#         sample = (image_id, image, report_ids, report_masks, seq_length)
+#         return sample
 
 
-class MimiccxrSingleImageDataset(BaseDataset):
-    def __getitem__(self, idx):
-        example = self.examples[idx]
-        image_id = example['id']
-        image_path = example['image_path']
+# class MimiccxrSingleImageDataset(BaseDataset):
+#     def __getitem__(self, idx):
+#         example = self.examples[idx]
+#         image_id = example['id']
+#         image_path = example['image_path']
 
-        image = Image.open(os.path.join(self.image_dir, image_path[0])).convert('RGB')
-        image_id = os.path.join(self.image_dir, image_path[0])
-        if self.transform is not None:
-            image = self.transform(image) # [3, 224, 224]
+#         image = Image.open(os.path.join(self.image_dir, image_path[0])).convert('RGB')
+#         image_id = os.path.join(self.image_dir, image_path[0])
+#         if self.transform is not None:
+#             image = self.transform(image) # [3, 224, 224]
 
-        report_ids = example['ids']
-        report_masks = example['mask']
-        seq_length = len(report_ids)
-        sample = (image_id, image, report_ids, report_masks, seq_length)
-        return sample
+#         report_ids = example['ids']
+#         report_masks = example['mask']
+#         seq_length = len(report_ids)
+#         sample = (image_id, image, report_ids, report_masks, seq_length)
+#         return sample

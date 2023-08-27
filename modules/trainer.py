@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from modules.base_cmn import set_flag
 
 
+
 class BaseTrainer(object):
     def __init__(self, model, criterion, metric_ftns, optimizer, args, lr_scheduler):
         
@@ -165,11 +166,10 @@ class BaseTrainer(object):
 
 
 class Trainer(BaseTrainer):
-    def __init__(self, model, criterion, metric_ftns, optimizer, args, lr_scheduler,
-                 train_dataloader, valid_dataloader, test_dataloader):
-        super(Trainer, self).__init__(model, criterion, metric_ftns, optimizer, args, lr_scheduler)
+    def __init__(self, model, criterion, optimizer, args,
+                 train_dataloader, test_dataloader):
+        super(Trainer, self).__init__(model, criterion, optimizer, args)
         self.train_dataloader = train_dataloader
-        self.valid_dataloader = valid_dataloader
         self.test_dataloader = test_dataloader
         self.writer = SummaryWriter(log_dir='D:/R2GenCMN_sem_best/forgetting_gate', flush_secs=20)
     def _train_epoch(self, epoch):
@@ -185,9 +185,8 @@ class Trainer(BaseTrainer):
         # [batch_size, max_seq_len], [batch_size, max_seq_len]
             # break    
             # print('reports_', reports_ids[0])
-            images, reports_ids = images.to(self.device), reports_ids.to(self.device)
-            reports_masks = reports_masks.to(self.device)
-            output = self.model(images, reports_ids, mode='train') # [batch_size, max_seq_len-1, vocab_size+1]
+            inp = torch.rand(4, 30, 4096).cuda()
+            output = self.model(inp) # [batch_size, max_seq_len-1, vocab_size+1]
             loss = self.criterion(output, reports_ids, reports_masks) # 6~7
             train_loss += loss.item()
             self.optimizer.zero_grad()
@@ -204,33 +203,7 @@ class Trainer(BaseTrainer):
         
         self.writer.add_scalar('Loss/Train', train_loss / len(self.train_dataloader), epoch)
         
-
-        # self.logger.info('[{}/{}] Start to evaluate in the validation set.'.format(epoch, self.epochs))
-        # self.model.eval()
-        # with torch.no_grad():
-        #     valid_gts, valid_res = [], []
-        #     for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.valid_dataloader):
-        #         # break
-        #         images, reports_ids = images.to(self.device), reports_ids.to(self.device)
-        #         reports_masks = reports_masks.to(self.device)
-        #         output, _ = self.model(images, mode='sample')
-        #         reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
-        #         ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
-        #         valid_res.extend(reports)
-        #         valid_gts.extend(ground_truths)
-                # break
-            # print('valid_gts',valid_gts)
-            # print('valid_gts',valid_gts.size())
-            # print('valid_ret',valid_res)
-            # print('valid_ret',valid_ret.size())
-            # print()
-                # print('ground_truths:', len(ground_truths))
-                
-            # valid_met = self.metric_ftns({i: [gt] for i, gt in enumerate(valid_gts)},
-            #                              {i: [re] for i, re in enumerate(valid_res)})
-            # # print(valid_met)
-            # # exit()
-            # log.update(**{'val_' + k: v for k, v in valid_met.items()})
+        ###################################################     test    #####################################################################
 
         self.logger.info('[{}/{}] Start to evaluate in the test set.'.format(epoch, self.epochs))
         self.model.eval()

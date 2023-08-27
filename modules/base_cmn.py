@@ -329,8 +329,8 @@ class EncoderLayer(nn.Module):
         self.sublayer = clones(SublayerConnection(size, dropout), 2)
         self.size = size
 
-    def forward(self, x, mask):
-        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask)) # attn: [batch_size, head, 98, 98]
+    def forward(self, x):
+        x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x)) # attn: [batch_size, head, 98, 98]
         return self.sublayer[1](x, self.feed_forward)
 
 
@@ -366,14 +366,14 @@ class Encoder(nn.Module):
         # self.semantic_map2 = SemanticMap(512, 60)
         # self.semantic_map3 = SemanticMap(512, 50)
 
-    def forward(self, x, mask):
-        no_layer = 1
-        for layer, forget_gate in zip(self.layers, self.forget_gates):
-            
-            x = layer(x, mask)
-            gate = forget_gate(x, layer = no_layer)
-            x = gate * x
-            no_layer += 1
+    def forward(self, x, mask = None):
+        # no_layer = 1
+        for layer in self.layers:
+            # print(x.size())
+            x = layer(x)
+            # gate = forget_gate(x, layer = no_layer)
+            # x = gate * x
+            # no_layer += 1
             # if flag == 0:
                 # x = self.semantic_map(x)
             # outputs.append(x.unsqueeze(1))
@@ -410,36 +410,13 @@ class Decoder(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, encoder, decoder, src_embed, tgt_embed, cmn):
+    def __init__(self, encoder, encoding):
         super(Transformer, self).__init__()
         self.encoder = encoder
-        self.decoder = decoder
-        self.src_embed = src_embed
-        self.tgt_embed = tgt_embed
-        self.cmn = cmn
+        self.position_encoding = encoding
+    def forward(self, src):
+        return self.encoder(self.position_encoding(src))
 
-    def forward(self, src, tgt, src_mask, tgt_mask, memory_matrix):
-        return self.decode(self.encode(src, src_mask), src_mask, tgt, tgt_mask, memory_matrix=memory_matrix)
-
-    def encode(self, src, src_mask): # [batch_size, 98, d_model], [batch_size, 1, 98]
-        # !!! mapping by disease classes
-        return self.encoder(src, src_mask) # [batch_size, 98, d_model]
-
-    def decode(self, memory, src_mask, tgt, tgt_mask, past=None, memory_matrix=None):
-        # print(tgt)
-        embeddings = self.tgt_embed(tgt) # [batch_size, seq_len, 768]
-        # print('embeddings',embeddings.size())
-        # exit()
-        
-        # Memory querying and responding for textual features
-        dummy_memory_matrix = memory_matrix.unsqueeze(0).expand(embeddings.size(0), memory_matrix.size(0),
-                                                                memory_matrix.size(1)) # [batch_size, cmm_size, cmm_dim]
-
-        responses = self.cmn(embeddings, dummy_memory_matrix, dummy_memory_matrix) # [batch_size, seq_len, 768]
-        embeddings = embeddings + responses
-        # Memory querying and responding for textual features
-
-        return self.decoder(embeddings, memory, src_mask, tgt_mask, past=past)
 
 
 class BaseCMN(AttModel):
@@ -450,8 +427,8 @@ class BaseCMN(AttModel):
         position = PositionalEncoding(self.d_model, self.dropout)
         model = Transformer(
             Encoder(EncoderLayer(self.d_model, c(attn), c(ff), self.dropout), self.num_layers),
-            Decoder(DecoderLayer(self.d_model, c(attn), c(attn), c(ff), self.dropout), self.num_layers),
-            nn.Sequential(c(position)), nn.Sequential(Embeddings(self.d_model, tgt_vocab), c(position)), cmn)
+            c(position)
+            )
         for p in model.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
@@ -533,7 +510,7 @@ class BaseCMN(AttModel):
 
         return att_feats, seq, att_masks, seq_mask # [batch_size, 98, d_model], [batch_size, max_seq_len-1], [batch_size, 98, 1], [1, max_seq_len-1, max_seq_len-1]
 
-    def _forward(self, fc_feats, att_feats, seq, att_masks=None): # seq: (batch_size, seq_len)
+    def _forward(self, x): # seq: (batch_size, seq_len)
         # print(self.memory_matrix.size())
         # heat_map = torch.matmul(self.memory_matrix, self.memory_matrix.transpose(1, 0)).detach().cpu().numpy()
         
@@ -543,11 +520,13 @@ class BaseCMN(AttModel):
         # plt.show()
         # plt.savefig(f'memory_matrix_similarity.png')
         # exit()
-        att_feats, seq, att_masks, seq_mask = self._prepare_feature_forward(att_feats, att_masks, seq)
+        
         # print(seq.size())
         # print(seq_mask.size())
         # exit()
-        out = self.model(att_feats, seq, att_masks, seq_mask, memory_matrix=self.memory_matrix) # [batch_size, seq_len, d_model]
+
+        out = self.model(x) # [batch_size, seq_len, d_model]
+        # print(out.size())
         outputs = F.log_softmax(self.logit(out), dim=-1) # [batch_size, max_seq_len-1, vocab_size+1]
 
         return outputs
