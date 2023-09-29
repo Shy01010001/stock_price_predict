@@ -84,7 +84,7 @@ def GetAllStockCodes():
     global today
     # today = datetime.today().date()
     # today = today.strftime('%Y-%m-%d')
-    today = "2023-08-25"
+    today = "2023-05-05"
     # today = datetime.datetime.now().date()
     rs = bs.query_all_stock(day=today)
     stockList = []
@@ -112,7 +112,7 @@ def GetAllHistData(stockList, data_sel):
             continue
         rs = bs.query_history_k_data_plus(stockCode,
                                           data_sel,
-                                          start_date="2008-5-01", end_date=str(today),
+                                          start_date="2008-05-05", end_date=str(today),
                                           frequency="d", adjustflag="3")
         if rs is None:
             print(f"查询股票代码{stockCode}的历史数据失败")
@@ -133,7 +133,6 @@ def GetAllHistData(stockList, data_sel):
         per = per.fillna(float(0.0))
         stockHistData[stockCode] = per
         flag += 1
-        # flag += 1
         # break
     bs.logout()
     # result.to_excel('close_data.xlsx', index=False)  # index=False表示不保存索引列
@@ -341,6 +340,7 @@ def SelectCross(short, long):
 
 def get_list(stock_data, window_size, interval):
     all_data = pd.concat(stock_data.values(), axis=1)
+    all_data = all_data.fillna(0.0)
     
     # 转置数据，使得日期成为行而不是列
     all_data = all_data.T
@@ -371,7 +371,7 @@ interval = 5
 window_size = 30
 
 stocks = GetAllStockCodes()
-stock_data = GetAllHistData(stocks[:2048], "close")
+stock_data = GetAllHistData(stocks, "close")
 # print(stock_data)
 
 stock_data_list, new_stock_data = get_list(stock_data, window_size, interval) # 3 time_window
@@ -399,8 +399,8 @@ data_dict['train'] = {'input' : train_input, 'label' : train_gtr}
 
 data_dict['test'] = {'input' : test_input, 'label' : test_gtr} 
 
-with open('./data.json', "w") as json_file:
-    json.dump(data_dict, json_file)
+# with open('./data.json', "w") as json_file:
+#     json.dump(data_dict, json_file)
 # new_stock_data = set_0_instead_nan(new_stock_data)
 
 # 将所有DataFrame合并成一个大的DataFrame

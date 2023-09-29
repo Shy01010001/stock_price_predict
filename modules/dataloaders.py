@@ -11,14 +11,15 @@ class R2DataLoader(DataLoader):
         self.shuffle = shuffle
         self.split = split
 
-        self.transform = transforms.Compose([
-            transforms.ToTensor()])
+        # self.transform = transforms.Compose([
+        #     transforms.ToTensor()])
 
-        self.dataset = BaseDataset('data.json', split, self.transform)
-
+        self.dataset = BaseDataset('data.json', split)
+        # print(self.dataset.size())
+        
         self.init_kwargs = {
             'dataset': self.dataset,
-            'batch_size': self.batch_size,
+            'batch_size': 4,
             'shuffle': self.shuffle,
             'num_workers': 1
         }

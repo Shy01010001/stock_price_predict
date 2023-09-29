@@ -118,15 +118,17 @@ def pos_tagging(documents, tokenizer):
 
 
 class BaseDataset(Dataset):
-    def __init__(self, path, split, transform):
+    def __init__(self, path, split):
         with open(path, 'r') as f:
             data = json.load(f)
             self.samples = data[split]
-        self.samples['input'] = transform(self.samples['input'])
-        self.samples['label'] = transform(self.samples['label'])
-        
+        self.samples['input'] = torch.tensor(np.array(self.samples['input']))
+        self.samples['label'] = torch.tensor(np.array(self.samples['label']))
+        # print(self.samples['input'].size())
+        # print(self.samples['label'].size())
+        # exit()
     def __len__(self):
-        return len(self.samples)
+        return len(self.samples['input'])
 
     def __getitem__(self, idx):
         input_data = self.samples['input'][idx]

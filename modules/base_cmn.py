@@ -458,7 +458,7 @@ class BaseCMN(AttModel):
         self.cmn = MultiThreadMemory(args.num_heads, args.d_model, topk=args.topk)
 
         self.model = self.make_model(tgt_vocab, self.cmn)
-        self.logit = nn.Linear(args.d_model, tgt_vocab)
+        self.logit = nn.Linear(args.d_model, args.d_model)
 
         self.memory_matrix = nn.Parameter(torch.FloatTensor(args.d_vf, args.cmm_dim)) # 多模态记忆 memory matrix
         nn.init.normal_(self.memory_matrix, 0, 1 / args.cmm_dim)
@@ -527,7 +527,7 @@ class BaseCMN(AttModel):
 
         out = self.model(x) # [batch_size, seq_len, d_model]
         # print(out.size())
-        outputs = F.log_softmax(self.logit(out), dim=-1) # [batch_size, max_seq_len-1, vocab_size+1]
+        outputs = self.logit(out) # [batch_size, max_seq_len-1, vocab_size+1]
 
         return outputs
 

@@ -5,14 +5,14 @@ import numpy as np
 import torch
 
 from models.models import BaseCMNModel
-from modules.dataloaders import R2DataLoader
-from modules.loss import compute_loss
+from modules.datasets import BaseDataset
 from modules.metrics import compute_scores
-from modules.optimizers import build_optimizer, build_lr_scheduler
 from modules.tokenizers import Tokenizer
 from modules.trainer import Trainer
 import torch.optim as optim
 import torch.nn as nn
+
+from torch.utils.data import DataLoader
 # from modules.base_cmn import get_dict
 # import json
 
@@ -42,7 +42,7 @@ def parse_args():
                         help='whether to load the pretrained visual extractor')
 
     # Model settings (for Transformer)
-    parser.add_argument('--d_model', type=int, default=4096, help='the dimension of Transformer')
+    parser.add_argument('--d_model', type=int, default=3648, help='the dimension of Transformer')
     parser.add_argument('--d_ff', type=int, default=512, help='the dimension of FFN')
     parser.add_argument('--d_vf', type=int, default=2048, help='the dimension of the patch features')
     parser.add_argument('--num_heads', type=int, default=8, help='the number of heads in Transformer')
@@ -80,7 +80,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=200, help='the number of training epochs')
     parser.add_argument('--save_dir', type=str, default='results/iu_xray', help='the patch to save the models')
     parser.add_argument('--record_dir', type=str, default='records/', help='the patch to save the results of experiments')
-    parser.add_argument('--log_period', type=int, default=1000, help='the logging interval (in batches)')
+    parser.add_argument('--log_period', type=int, default=25, help='the logging interval (in batches)')
     parser.add_argument('--save_period', type=int, default=1, help='the saving period (in epochs)')
     parser.add_argument('--monitor_mode', type=str, default='max', choices=['min', 'max'],
                         help='whether to max or min the metric')
@@ -136,8 +136,10 @@ def main():
     np.random.seed(args.seed)
     
     # create data loader
-    train_dataloader = R2DataLoader(args, split='train', shuffle=True)
-    test_dataloader = R2DataLoader(args, split='test', shuffle=False)
+    train_data = BaseDataset('data.json', 'train')
+    test_data = BaseDataset('data.json', 'test')
+    train_dataloader = DataLoader(train_data, batch_size = args.batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size = args.batch_size, shuffle=False)
 
     # build model architecture
     model = BaseCMNModel(args, tokenizer)
@@ -158,10 +160,11 @@ def main():
     eps=eps,
     weight_decay=weight_decay
 )
+
     # lr_scheduler = build_lr_scheduler(args, optimizer)
 
     # build trainer and start to train
-    trainer = Trainer(model, criterion, metrics, optimizer, args,
+    trainer = Trainer(model, criterion, optimizer, args,
                       train_dataloader, test_dataloader)
     trainer.train()
 

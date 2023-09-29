@@ -8,11 +8,13 @@ import torch
 import json
 from torch.utils.tensorboard import SummaryWriter
 from modules.base_cmn import set_flag
+from modules.metrics import calculate_accuracy
+import pdb
 
 
 
 class BaseTrainer(object):
-    def __init__(self, model, criterion, metric_ftns, optimizer, args, lr_scheduler):
+    def __init__(self, model, optimizer, args):
         
         
         self.args = args
@@ -26,11 +28,8 @@ class BaseTrainer(object):
         self.model = model.to(self.device)
         if len(device_ids) > 1:
             self.model = torch.nn.DataParallel(model, device_ids=device_ids)
-
-        self.criterion = criterion
-        self.metric_ftns = metric_ftns
         self.optimizer = optimizer
-        self.lr_scheduler = lr_scheduler
+
 
         self.epochs = self.args.epochs
         self.save_period = self.args.save_period
@@ -67,7 +66,7 @@ class BaseTrainer(object):
             # save logged information into log dict
             log = {'epoch': epoch}
             log.update(result)
-            self._record_best(log)
+            # self._record_best(log)
 
             # print logged information to the screen
             for key, value in log.items():
@@ -168,10 +167,12 @@ class BaseTrainer(object):
 class Trainer(BaseTrainer):
     def __init__(self, model, criterion, optimizer, args,
                  train_dataloader, test_dataloader):
-        super(Trainer, self).__init__(model, criterion, optimizer, args)
+        super(Trainer, self).__init__(model, optimizer, args)
+        self.criterion = criterion
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
-        self.writer = SummaryWriter(log_dir='D:/R2GenCMN_sem_best/forgetting_gate', flush_secs=20)
+        self.writer = SummaryWriter(log_dir='./loss', flush_secs=20)
+        self.writer1 = SummaryWriter(log_dir='./evaluation', flush_secs=20)
     def _train_epoch(self, epoch):
         log = {}
         # if (epoch - 1) % 4 == 0:
@@ -180,26 +181,31 @@ class Trainer(BaseTrainer):
         train_loss = 0
         
         self.model.train()
-        for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.train_dataloader):
+        # pdb.set_trace()
+        for batch_idx, (input_data, label) in enumerate(self.train_dataloader):
         # tuple: len=batch_size "CXR2384_IM-0942"等, [batch_size, image_num, 3, 224, 224]
         # [batch_size, max_seq_len], [batch_size, max_seq_len]
             # break    
             # print('reports_', reports_ids[0])
-            inp = torch.rand(4, 30, 4096).cuda()
-            output = self.model(inp) # [batch_size, max_seq_len-1, vocab_size+1]
-            loss = self.criterion(output, reports_ids, reports_masks) # 6~7
+            # inp = torch.rand(4, 30, 4096).cuda()
+            input_data = input_data.cuda()
+            label = label.cuda()
+            input_data = input_data[:, :, :-1].to(dtype=torch.float32)
+            label = label[:, :-1].to(dtype=torch.float32)
+            # print(input_data.size())
+            # print(label.size())
+            # exit()
+            output = self.model(input_data) # [batch_size, max_seq_len-1, vocab_size+1]
+            output = output[:, -1, :]
+            # print(output.size())
+      
+            loss = self.criterion(output, label) # 6~7
             train_loss += loss.item()
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
             if batch_idx % self.args.log_period == 0:
-                report = torch.argmax(output, -1)
-                reports = self.model.tokenizer.decode_batch(report.detach().cpu().numpy())                
-                self.logger.info('Epoch: {}/{}, Step: {}/{}, Training Loss: {:.5f}.reports: {}'
-                                  .format(epoch, self.epochs, batch_idx, len(self.train_dataloader),
-                                          train_loss / (batch_idx + 1), reports[0]))
-            # break
-        log = {'train_loss': train_loss / len(self.train_dataloader)}
+                log = {'train_loss': train_loss / len(self.train_dataloader)}
         
         self.writer.add_scalar('Loss/Train', train_loss / len(self.train_dataloader), epoch)
         
@@ -207,59 +213,33 @@ class Trainer(BaseTrainer):
 
         self.logger.info('[{}/{}] Start to evaluate in the test set.'.format(epoch, self.epochs))
         self.model.eval()
+        score = 0
         with torch.no_grad():
-            test_gts, test_res = [], []
-            expert = ['CXR3030_IM-1405', 'CXR2686_IM-1158', 'CXR458_IM-2089', 'CXR3430_IM-1659']
             set_flag.set_epoch(epoch)
-            for batch_idx, (images_id, images, reports_ids, reports_masks) in enumerate(self.test_dataloader):
-                sent = []
-                for ids in expert:
-                    try:
-                        sent_id = images_id.index(ids)
-                        sent.append(sent_id)
-                        # print(sent)
-                    except:
-                        pass
-                for ss in sent:
-                    expert.remove(images_id[ss])
+            for batch_idx, (input_data, label) in enumerate(self.test_dataloader):
+                input_data = input_data.cuda()
+                label = label.cuda()
+                input_data = input_data[:, :, :-1].to(dtype=torch.float32)
+                label = label[:, :-1].to(dtype=torch.float32)
+                # print(input_data.size())
+                # print(label.size())
+                # exit()
+                output = self.model(input_data) # [batch_size, max_seq_len-1, vocab_size+1]
+                output = output[:, -1, :]
+                # print(output.size())
+          
+                loss = self.criterion(output, label) # 6~7
+                train_loss += loss.item()
+                # self.optimizer.zero_grad()
+                # loss.backward()
+                # self.optimizer.step()
+                score = score + calculate_accuracy(output, label) 
+                # log = {'train_loss': train_loss / len(self.train_dataloader)}
                     # print(expert)
-                    
-                if len(sent) != 0:
-                    set_flag.set_image_id(sent, images_id)
-                    
-                images, reports_ids = images.to(self.device), reports_ids.to(self.device)
-                reports_masks = reports_masks.to(self.device)
-
-                output, _ = self.model(images, mode='sample') # BaseCMNModel: [batch_size, max_seq_len-1, vocab_size+1], [batch_size, 2, 3, 224, 224]
-                reports = self.model.tokenizer.decode_batch(output.cpu().numpy())
-                ground_truths = self.model.tokenizer.decode_batch(reports_ids[:, 1:].cpu().numpy())
-                test_res.extend(reports)
-                test_gts.extend(ground_truths)
-                set_flag.set_image_id()
-                # break
-            # !!! print generated and ground-truth reports
-            f_res = open(f'records/reports_tanh_{epoch}.txt', 'w')
-            for line in test_res:
-                f_res.write(line+'\n')
-            f_res.close()
-            #f_gts = open('records/truths.txt', 'w')
-            #for line in test_gts:
-            #    f_gts.write(line+'\n')
-            #f_gts.close()
-            # dic = {}
-            # dic['gts'] = test_gts
-            # dic['best'] = test_res
-            # with open('./reports_record.json', 'w') as f:
-            #     json.dump(dic, f)
-            test_met = self.metric_ftns({i: [gt] for i, gt in enumerate(test_gts)},
-                                        {i: [re] for i, re in enumerate(test_res)})
-            #print(test_met)
-            #exit()
-            log.update(**{'test_' + k: v for k, v in test_met.items()})
-            for k, v in test_met.items():
-                self.writer.add_scalar(f'{k}/epoch', v, epoch)
-
-        self.lr_scheduler.step()
+        score = score / len(self.test_dataloader)
+        print(f'epoch {epoch} accurency: \n', score)
+        self.writer.add_scalar('Currency', score, epoch)
+        score = 0
         # else:
         #     pass
         return log

@@ -3,6 +3,18 @@ from sklearn.metrics import roc_auc_score, f1_score, recall_score, precision_sco
 from pycocoevalcap.bleu.bleu import Bleu
 # from pycocoevalcap.meteor import Meteor
 from pycocoevalcap.rouge import Rouge
+import torch
+
+def calculate_accuracy(tensor1, tensor2):
+    # 将输入张量二值化，大于0的变为1，小于等于0的变为0
+    tensor1_binary = (tensor1 > 0).float()
+    tensor2_binary = (tensor2 > 0).float()
+    equal_elements = torch.eq(tensor1_binary, tensor2_binary).float()
+    total_num = 1
+    for i in tensor1.size():
+        total_num = total_num * i
+    return torch.sum(equal_elements) / total_num
+    
 
 
 def compute_scores(gts, res):
