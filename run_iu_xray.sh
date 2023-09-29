@@ -17,5 +17,5 @@ python main.py \
     --seed 7580 \
     --beam_size 3 \
     --save_dir results/iu_xray/ \
-    --log_period 200 \
+    --log_period 25 \
     --num_classes 60
