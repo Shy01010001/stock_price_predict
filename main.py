@@ -43,7 +43,7 @@ def parse_args():
 
     # Model settings (for Transformer)
     parser.add_argument('--d_model', type=int, default=3648, help='the dimension of Transformer')
-    parser.add_argument('--d_ff', type=int, default=512, help='the dimension of FFN')
+    parser.add_argument('--d_ff', type=int, default=3648, help='the dimension of FFN')
     parser.add_argument('--d_vf', type=int, default=2048, help='the dimension of the patch features')
     parser.add_argument('--num_heads', type=int, default=8, help='the number of heads in Transformer')
     parser.add_argument('--num_layers', type=int, default=3, help='the number of layers of Transformer')
@@ -104,6 +104,7 @@ def parse_args():
 
     # Others
     parser.add_argument('--seed', type=int, default=9233, help='.')
+    parser.add_argument('--experiment_name', type=str, default='encoder', help='.')
     # parser.add_argument('--resume', type=str, default = './results/iu_xray/checkpoint_epoch_100.pth', help='whether to resume the training from existing checkpoints')
     parser.add_argument('--resume', type=str, help='whether to resume the training from existing checkpoints')
 # 

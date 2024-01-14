@@ -18,4 +18,5 @@ python main.py \
     --beam_size 3 \
     --save_dir results/iu_xray/ \
     --log_period 25 \
-    --num_classes 60
+    --num_classes 60 \
+    --experiment_name encoder_with_position

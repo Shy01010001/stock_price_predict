@@ -7,6 +7,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
 import matplotlib.pyplot as plt
 import spacy
+
+torch.set_printoptions(threshold=float('inf'))
 # def min_max_norm(data_dict):
 #     minm = 1000.
 #     maxm = .0
@@ -124,9 +126,39 @@ class BaseDataset(Dataset):
             self.samples = data[split]
         self.samples['input'] = torch.tensor(np.array(self.samples['input']))
         self.samples['label'] = torch.tensor(np.array(self.samples['label']))
+        self.data_filter()
         # print(self.samples['input'].size())
-        # print(self.samples['label'].size())
-        # exit()
+        print(self.samples['input'].any())
+        print(self.samples['label'])
+        exit()
+    def data_filter(self):
+        
+        each_stock_input = self.samples['input'].transpose(0, 2)
+        each_stock_input = each_stock_input.reshape(each_stock_input.size(0), 430 * 30)
+        each_stock_label = self.samples['label'].transpose(0, 1)
+        filt = torch.ones(each_stock_input.size(0), dtype=torch.bool)
+        for i in range(each_stock_input.size(0)):
+            # print(each_stock_input[0])
+            zero_num = torch.eq(each_stock_input[0], 0)
+            # print(zero_num)
+            zero_num = torch.sum(zero_num)
+            print(zero_num)
+            x = input()
+            if x == '1':
+                pass
+            else:
+                exit()
+            if zero_num > (each_stock_input.size(0) * 0.1):
+                filt[i] = 0
+            else:
+                print(each_stock_input[i])
+                
+        each_stock_input = each_stock_input[filt, :]
+        each_stock_label = each_stock_label[filt, :]
+        print('input size:',each_stock_input.size())
+        print('label size:',each_stock_label.size())
+        exit()
+
     def __len__(self):
         return len(self.samples['input'])
 
@@ -135,6 +167,10 @@ class BaseDataset(Dataset):
         gtr = self.samples['label'][idx]
         
         return (input_data, gtr)
+data_file = '../data.json'
+split = 'train'
+dataset = BaseDataset(data_file, split)
+
 
 # class IuxrayMultiImageDataset(BaseDataset):
 #     def __getitem__(self, idx):

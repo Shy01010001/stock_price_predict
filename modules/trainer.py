@@ -18,7 +18,7 @@ class BaseTrainer(object):
         
         
         self.args = args
-
+        self.experiment_name = args.experiment_name
         logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
                             datefmt='%m/%d/%Y %H:%M:%S', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
@@ -171,7 +171,12 @@ class Trainer(BaseTrainer):
         self.criterion = criterion
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
-        self.writer = SummaryWriter(log_dir='./loss', flush_secs=20)
+        try:
+            os.mkdir(f'./loss/{self.experiment_name}')
+        except:
+            print('experiment record already exist')
+            pass
+        self.writer = SummaryWriter(log_dir=f'./loss/{self.experiment_name}', flush_secs=20)
         self.writer1 = SummaryWriter(log_dir='./evaluation', flush_secs=20)
     def _train_epoch(self, epoch):
         log = {}
@@ -208,7 +213,7 @@ class Trainer(BaseTrainer):
                 log = {'train_loss': train_loss / len(self.train_dataloader)}
         
         self.writer.add_scalar('Loss/Train', train_loss / len(self.train_dataloader), epoch)
-        
+        self.writer.add_scalar('LR/Train', self.optimizer.param_groups[0]['lr'] , epoch)
         ###################################################     test    #####################################################################
 
         self.logger.info('[{}/{}] Start to evaluate in the test set.'.format(epoch, self.epochs))
@@ -233,6 +238,10 @@ class Trainer(BaseTrainer):
                 # self.optimizer.zero_grad()
                 # loss.backward()
                 # self.optimizer.step()
+                print(output)
+                print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n***********************************\n!!!!!!!!!!!!!!!!!')
+                print(label)
+                exit()
                 score = score + calculate_accuracy(output, label) 
                 # log = {'train_loss': train_loss / len(self.train_dataloader)}
                     # print(expert)

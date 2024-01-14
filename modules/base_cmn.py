@@ -415,6 +415,7 @@ class Transformer(nn.Module):
         self.encoder = encoder
         self.position_encoding = encoding
     def forward(self, src):
+        src = self.position_encoding(src)
         return self.encoder(self.position_encoding(src))
 
 
@@ -527,7 +528,9 @@ class BaseCMN(AttModel):
 
         out = self.model(x) # [batch_size, seq_len, d_model]
         # print(out.size())
-        outputs = self.logit(out) # [batch_size, max_seq_len-1, vocab_size+1]
+        outputs = self.logit(out)  # [batch_size, max_seq_len-1, vocab_size+1]
+        # print(outputs.size())
+        # exit()
 
         return outputs
 

@@ -1,3 +1,4 @@
 results/
 loss/
+evaluation/
 *.json

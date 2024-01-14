@@ -4,6 +4,7 @@ from pycocoevalcap.bleu.bleu import Bleu
 # from pycocoevalcap.meteor import Meteor
 from pycocoevalcap.rouge import Rouge
 import torch
+import pdb
 
 def calculate_accuracy(tensor1, tensor2):
     # 将输入张量二值化，大于0的变为1，小于等于0的变为0
@@ -14,8 +15,11 @@ def calculate_accuracy(tensor1, tensor2):
     for i in tensor1.size():
         total_num = total_num * i
     return torch.sum(equal_elements) / total_num
-    
 
+# pdb.set_trace()
+# a = torch.randn(5,5)
+# b = torch.randn(5,5)
+# calculate_accuracy(a, b)
 
 def compute_scores(gts, res):
     """
