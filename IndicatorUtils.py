@@ -14,9 +14,12 @@ import numpy as np
 from tqdm import tqdm
 import yfinance as yf
 # from DataUtils import *
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import json
+import pickle
+from functools import lru_cache
+import os
 
 def drawPlot(long, short, code):
     global short_window, long_window
@@ -32,6 +35,98 @@ def drawPlot(long, short, code):
     plt.savefig(f'./meanFig/{code}.jpg')
     plt.show()
     
+
+
+    
+class data_get:
+    def __init__(self):
+        
+        self.today = self.get_latest_val_date()
+        self.code_df = self.GetAllStockCodes()
+    
+    def get_latest_val_date(self):
+        today = datetime.now()
+        weekday = today.weekday()
+        if weekday == 5:
+            today = today - timedelta(1)
+        elif weekday == 6:
+            today = today - timedelta(2)
+        today = today.strftime('%Y-%m-%d')
+        
+        return today
+    def data_save(self, data, name):
+        with open(name + '.pkl', 'wb') as file:
+            pickle.dump(data, file)
+    
+    def data_load(self, name):
+        with open(name + '.pkl', 'rb') as file:
+            return pickle.load(file)
+        
+    def GetAllStockCodes(self, kinds='all', login=True):
+        data_name = f'codes_{kinds}'
+        if os.path.exists(f'./{data_name}.pkl'):
+            print(111)
+            return self.data_load(data_name)
+        else:
+            print(222)
+            lg = bs.login()
+            rs = bs.query_all_stock(day=self.today)
+            df = rs.get_data()
+            if kinds == 'all':
+                code_df = df
+            else:
+                mask = df["code"].str.startswith(kinds)
+                code_df = df[mask]
+        
+            if login:
+                bs.logout()
+            self.data_save(code_df, data_name)
+            return code_df        
+    def name_to_code(self,name):
+
+        return self.code_df[self.code_df['code_name'] == name]['code'].iloc[0]
+        
+    def code_to_name(self,code):
+        
+        return self.code_df[self.code_df['code'] == code]['code_name'].iloc[0]
+        
+    def GetAllHistData(self, stockList, data_sel, start_data = '2008-08-08', end_data='2024-01-08', frequency = 'd'):
+    
+        per = []
+        stockHistData = {}
+        flag = 0
+        for stockCode in stockList:
+            if flag == 100:
+                break
+            if 'bj' in stockCode:
+                continue
+            rs = bs.query_history_k_data_plus(stockCode,
+                                              data_sel,
+                                              start_date=start_data, end_date=end_data,
+                                              frequency=frequency, adjustflag="3")
+            if rs is None:
+                print(f"查询股票代码{stockCode}的历史数据失败")
+                continue
+            if rs.error_code != '0':
+                print(f"查询股票代码{stockCode}的历史数据失败，错误信息：{rs.error_msg}")
+                continue
+    
+    
+            data_list = []
+            while (rs.error_code == '0') & rs.next():
+                data_list.append(rs.get_row_data())
+            result = pd.DataFrame(data_list, columns=rs.fields)
+            # result.set_index("date", inplace=True)
+            result = result.astype('float')
+            per = result.pct_change()
+            
+            per = per.fillna(float(0.0))
+            stockHistData[stockCode] = per
+            flag += 1
+            # break
+        bs.logout()
+        # result.to_excel('close_data.xlsx', index=False)  # index=False表示不保存索引列
+        return stockHistData 
     
 def CalcRsiValue(data, n=14, buy_threshold=30, sell_threshold=70):
     """
@@ -76,31 +171,9 @@ def CalcRsiValue(data, n=14, buy_threshold=30, sell_threshold=70):
     return rsi_values, trade_signal_dict
     
     
-def GetAllStockCodes():
-    lg = bs.login()
-    if lg.error_code != '0':
-        print("login failed:", lg.error_msg)
-        return None
-    global today
-    # today = datetime.today().date()
-    # today = today.strftime('%Y-%m-%d')
-    today = "2023-05-05"
-    # today = datetime.datetime.now().date()
-    rs = bs.query_all_stock(day=today)
-    stockList = []
-    # rs = bs.query_all_stock(day=today)
-    # flag = 0
-    
-    while (rs.error_code == '0') & rs.next():
-        code = rs.get_row_data()[0]
-        if "bj" in code or 'sz' in code:
-            continue
-        stockList.append(code)
 
-    # x = np.random.randint(len(stockList) - num)
-    return stockList
 
-def GetAllHistData(stockList, data_sel):
+def GetAllHistData(stockList, data_sel, start_data = '2008-08-08', end_data='2024-01-08', frequency = 'd'):
 
     per = []
     stockHistData = {}
@@ -112,8 +185,8 @@ def GetAllHistData(stockList, data_sel):
             continue
         rs = bs.query_history_k_data_plus(stockCode,
                                           data_sel,
-                                          start_date="2008-05-05", end_date=str(today),
-                                          frequency="d", adjustflag="3")
+                                          start_date=start_data, end_date=end_data,
+                                          frequency=frequency, adjustflag="3")
         if rs is None:
             print(f"查询股票代码{stockCode}的历史数据失败")
             continue
@@ -370,34 +443,34 @@ def get_gtr(stock_data_list, interval, window_size):
 interval = 5
 window_size = 30
 
-stocks = GetAllStockCodes()
-stock_data = GetAllHistData(stocks, "close")
-# print(stock_data)
+# stocks = GetAllStockCodes()s
+# stock_data = GetAllHistData(stocks, "close")
+# # print(stock_data)
 
-stock_data_list, new_stock_data = get_list(stock_data, window_size, interval) # 3 time_window
-gtr = get_gtr(stock_data_list, interval, window_size)
+# stock_data_list, new_stock_data = get_list(stock_data, window_size, interval) # 3 time_window
+# gtr = get_gtr(stock_data_list, interval, window_size)
 
 
 
-train_ratio = 0.9
-total_num = len(new_stock_data)
+# train_ratio = 0.9
+# total_num = len(new_stock_data)
 
-train_num = int(total_num * train_ratio)
-random.seed(1)
-random.shuffle(new_stock_data)
-random.seed(1)
-random.shuffle(gtr)
+# train_num = int(total_num * train_ratio)
+# random.seed(1)
+# random.shuffle(new_stock_data)
+# random.seed(1)
+# random.shuffle(gtr)
 
-train_input = new_stock_data[: train_num]
-train_gtr = gtr[:train_num]
+# train_input = new_stock_data[: train_num]
+# train_gtr = gtr[:train_num]
 
-test_input = new_stock_data[train_num:]
-test_gtr = gtr[train_num:]
+# test_input = new_stock_data[train_num:]
+# test_gtr = gtr[train_num:]
 
-data_dict = {}
-data_dict['train'] = {'input' : train_input, 'label' : train_gtr}
+# data_dict = {}
+# data_dict['train'] = {'input' : train_input, 'label' : train_gtr}
 
-data_dict['test'] = {'input' : test_input, 'label' : test_gtr} 
+# data_dict['test'] = {'input' : test_input, 'label' : test_gtr} 
 
 # with open('./data.json', "w") as json_file:
 #     json.dump(data_dict, json_file)
