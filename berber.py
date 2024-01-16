@@ -20,10 +20,13 @@ import json
 from utils import *
 from functools import lru_cache
 
-
-start = time.perf_counter()
-datas = data_get()
 time_record()
-end = time.perf_counter()
+
+datas = data_get()
+ziguang = datas.GetAllHistData(['sz.002049'], "date,time,code,open,high,low,close,volume,amount,adjustflag", frequency='5')
+datas.data_save(ziguang, 'ziguang')
+
+# print(datas.codes_dict['sz'])
+
 time_record('end')
 

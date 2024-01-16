@@ -41,8 +41,9 @@ def drawPlot(long, short, code):
 class data_get:
     def __init__(self):
         
+        self.codes_dict = {}
         self.today = self.get_latest_val_date()
-        self.code_df = self.GetAllStockCodes()
+        self.GetAllStockCodes()
     
     def get_latest_val_date(self):
         today = datetime.now()
@@ -61,27 +62,32 @@ class data_get:
     def data_load(self, name):
         with open(name + '.pkl', 'rb') as file:
             return pickle.load(file)
+    
+    # def stock_select(self, marcket = ['sz', 'sh'], ratio = [1, 1]):
         
+    
     def GetAllStockCodes(self, kinds='all', login=True):
-        data_name = f'codes_{kinds}'
-        if os.path.exists(f'./{data_name}.pkl'):
-            print(111)
-            return self.data_load(data_name)
+        code_name = 'codes_dict'
+        if os.path.exists(f'./{code_name}.pkl'):
+            self.codes_dict = self.data_load(code_name)
         else:
-            print(222)
             lg = bs.login()
             rs = bs.query_all_stock(day=self.today)
             df = rs.get_data()
-            if kinds == 'all':
-                code_df = df
-            else:
-                mask = df["code"].str.startswith(kinds)
-                code_df = df[mask]
-        
+            index_mask = df['code_name'].str.contains('指数')
+            index_df = df[index_mask]
+            single_stock_df = df[~index_mask]
+            ### split sz, bj, sh ######
+            for kind in ['bj', 'sh', 'sz']:
+                single_stock_mask = single_stock_df["code"].str.startswith(kind)
+                split_code_df = single_stock_df[single_stock_mask]
+                self.codes_dict[kind] = split_code_df.set_index('code')['code_name'].to_dict()
+            self.codes_dict['指数'] = index_df.set_index('code')['code_name'].to_dict()
             if login:
                 bs.logout()
-            self.data_save(code_df, data_name)
-            return code_df        
+            
+            self.data_save(self.codes_dict, code_name)
+            
     def name_to_code(self,name):
 
         return self.code_df[self.code_df['code_name'] == name]['code'].iloc[0]
@@ -90,41 +96,44 @@ class data_get:
         
         return self.code_df[self.code_df['code'] == code]['code_name'].iloc[0]
         
-    def GetAllHistData(self, stockList, data_sel, start_data = '2008-08-08', end_data='2024-01-08', frequency = 'd'):
-    
+    def GetAllHistData(self, stockList, data_sel, start_data = '2008-01-04', end_data='2024-01-08', frequency = 'd'):
+        lg = bs.login()
         per = []
         stockHistData = {}
         flag = 0
         for stockCode in stockList:
-            if flag == 100:
-                break
+            # if flag == 100:
+            #     break
             if 'bj' in stockCode:
                 continue
             rs = bs.query_history_k_data_plus(stockCode,
                                               data_sel,
                                               start_date=start_data, end_date=end_data,
-                                              frequency=frequency, adjustflag="3")
+                                              frequency=frequency, adjustflag="2")
             if rs is None:
                 print(f"查询股票代码{stockCode}的历史数据失败")
                 continue
             if rs.error_code != '0':
                 print(f"查询股票代码{stockCode}的历史数据失败，错误信息：{rs.error_msg}")
                 continue
-    
-    
+
+
             data_list = []
             while (rs.error_code == '0') & rs.next():
                 data_list.append(rs.get_row_data())
             result = pd.DataFrame(data_list, columns=rs.fields)
-            # result.set_index("date", inplace=True)
-            result = result.astype('float')
-            per = result.pct_change()
-            
-            per = per.fillna(float(0.0))
-            stockHistData[stockCode] = per
-            flag += 1
-            # break
+            result = pd.DataFrame(data_list, columns=rs.fields)
+    
+            # 转换日期列为日期时间对象
+            result['date'] = pd.to_datetime(result['date'])
+    
+            # 将数值列转换为浮点数类型
+            result[['open', 'high', 'low', 'close', 'volume', 'amount']] = result[['open', 'high', 'low', 'close', 'volume', 'amount']].astype(float)
+    
+            stockHistData[stockCode] = result
+            self.data_save(stockHistData, f'{stockCode}')
         bs.logout()
+        
         # result.to_excel('close_data.xlsx', index=False)  # index=False表示不保存索引列
         return stockHistData 
     
