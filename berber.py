@@ -23,8 +23,9 @@ from functools import lru_cache
 time_record()
 
 datas = data_get()
-ziguang = datas.GetAllHistData(['sz.002049'], "date,time,code,open,high,low,close,volume,amount,adjustflag", frequency='5')
-datas.data_save(ziguang, 'ziguang')
+# ziguang = datas.GetAllHistData(['sz.002049'], "date,time,code,open,high,low,close,volume,amount,adjustflag", frequency='5')
+# datas.data_save(ziguang, 'ziguang')
+data = datas.data_load('ziguang')
 
 # print(datas.codes_dict['sz'])
 
